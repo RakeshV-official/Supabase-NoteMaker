@@ -644,9 +644,9 @@ export default function KanbanBoard() {
                                     ref={provided.innerRef}
                                     {...provided.draggableProps}
                                     {...provided.dragHandleProps}
-                                    className={`mb-4 group ${snapshot.isDragging ? 'rotate-3 scale-105 shadow-2xl z-50' : 'card-hover'}`}
+                                    className={`mb-4 group ${snapshot.isDragging ? 'shadow-2xl ring-2 ring-indigo-400' : 'card-hover'}`}
                                   >
-                                    <div className="bg-white rounded-xl shadow-lg border border-slate-200/60 overflow-hidden">
+                                    <div className="bg-white rounded-xl shadow-lg border border-slate-200/60">
                                       <div className="p-5">
                                         <div className="flex items-start justify-between mb-3">
                                           <h4 className="font-semibold text-slate-800 leading-snug flex-1 pr-2">

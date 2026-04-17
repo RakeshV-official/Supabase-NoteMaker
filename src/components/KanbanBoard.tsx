@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import { Plus, MoreHorizontal, Edit2, Trash2, LogOut, User, Sparkles, Clock, CheckCircle2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -600,7 +601,7 @@ export default function KanbanBoard() {
               .sort((a, b) => a.position - b.position)
               .map((list, listIndex) => (
                 <div key={list.id} className="flex-shrink-0 w-80 slide-in-up" style={{ animationDelay: `${listIndex * 0.1}s` }}>
-                  <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20">
+                  <div className="bg-white rounded-2xl shadow-xl border border-slate-200">
                     {/* List Header */}
                     <div className={`p-6 bg-gradient-to-r ${getListColor(list.title)} text-white relative rounded-t-2xl overflow-hidden`}>
                       <div className="absolute inset-0 bg-black/10"></div>
@@ -639,60 +640,69 @@ export default function KanbanBoard() {
                             .sort((a, b) => a.position - b.position)
                             .map((card, index) => (
                               <Draggable key={card.id} draggableId={card.id} index={index}>
-                                {(provided, snapshot) => (
-                                  <div
-                                    ref={provided.innerRef}
-                                    {...provided.draggableProps}
-                                    {...provided.dragHandleProps}
-                                    style={{
-                                      ...provided.draggableProps.style,
-                                      zIndex: snapshot.isDragging ? 9999 : 'auto',
-                                    }}
-                                    className={`mb-4 group ${snapshot.isDragging ? 'shadow-2xl ring-2 ring-indigo-400' : 'card-hover'}`}
-                                  >
-                                    <div className="bg-white rounded-xl shadow-lg border border-slate-200/60">
-                                      <div className="p-5">
-                                        <div className="flex items-start justify-between mb-3">
-                                          <h4 className="font-semibold text-slate-800 leading-snug flex-1 pr-2">
-                                            {card.title}
-                                          </h4>
-                                          <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all">
-                                              <Edit2 className="w-3.5 h-3.5" />
-                                            </button>
-                                            <button
-                                              onClick={() => deleteCard(card.id)}
-                                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                                            >
-                                              <Trash2 className="w-3.5 h-3.5" />
-                                            </button>
-                                          </div>
-                                        </div>
-
-                                        {card.description && (
-                                          <p className="text-sm text-slate-600 mb-4 leading-relaxed">
-                                            {card.description}
-                                          </p>
-                                        )}
-
-                                        <div className="flex items-center justify-between text-xs text-slate-500">
-                                          <div className="flex items-center space-x-2">
-                                            <Clock className="w-3.5 h-3.5" />
-                                            <span>{formatDate(card.created_at)}</span>
-                                          </div>
-                                          {list.title === 'Done' && (
-                                            <div className="flex items-center space-x-1 text-green-600">
-                                              <CheckCircle2 className="w-3.5 h-3.5" />
-                                              <span className="font-medium">Complete</span>
+                                {(provided, snapshot) => {
+                                  const cardElement = (
+                                    <div
+                                      ref={provided.innerRef}
+                                      {...provided.draggableProps}
+                                      {...provided.dragHandleProps}
+                                      style={{
+                                        ...provided.draggableProps.style,
+                                        zIndex: snapshot.isDragging ? 9999 : 'auto',
+                                      }}
+                                      className={`mb-4 group ${snapshot.isDragging ? 'shadow-2xl ring-2 ring-indigo-400' : 'card-hover'}`}
+                                    >
+                                      <div className="bg-white rounded-xl shadow-lg border border-slate-200/60">
+                                        <div className="p-5">
+                                          <div className="flex items-start justify-between mb-3">
+                                            <h4 className="font-semibold text-slate-800 leading-snug flex-1 pr-2">
+                                              {card.title}
+                                            </h4>
+                                            <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                              <button className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all">
+                                                <Edit2 className="w-3.5 h-3.5" />
+                                              </button>
+                                              <button
+                                                onClick={() => deleteCard(card.id)}
+                                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                              >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                              </button>
                                             </div>
-                                          )}
-                                        </div>
-                                      </div>
+                                          </div>
 
-                                      <div className={`h-1 bg-gradient-to-r ${getListColor(list.title)} opacity-60`}></div>
+                                          {card.description && (
+                                            <p className="text-sm text-slate-600 mb-4 leading-relaxed">
+                                              {card.description}
+                                            </p>
+                                          )}
+
+                                          <div className="flex items-center justify-between text-xs text-slate-500">
+                                            <div className="flex items-center space-x-2">
+                                              <Clock className="w-3.5 h-3.5" />
+                                              <span>{formatDate(card.created_at)}</span>
+                                            </div>
+                                            {list.title === 'Done' && (
+                                              <div className="flex items-center space-x-1 text-green-600">
+                                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                                <span className="font-medium">Complete</span>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+
+                                        <div className={`h-1 bg-gradient-to-r ${getListColor(list.title)} opacity-60`}></div>
+                                      </div>
                                     </div>
-                                  </div>
-                                )}
+                                  )
+
+                                  // 🛠️ PORTAL FIX: When dragging, render through document.body
+                                  // This escapes ALL parent stacking contexts (backdrop-blur, transform, overflow)
+                                  if (snapshot.isDragging && typeof document !== 'undefined') {
+                                    return createPortal(cardElement, document.body)
+                                  }
+                                  return cardElement
+                                }}
                               </Draggable>
                             ))}
                           {provided.placeholder}

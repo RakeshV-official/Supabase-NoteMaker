@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
-import { Plus, MoreHorizontal, Edit2, Trash2, LogOut, User, Sparkles, Calendar, Clock, CheckCircle2 } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd'
+import { Plus, MoreHorizontal, Edit2, Trash2, LogOut, User, Sparkles, Clock, CheckCircle2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { Database } from '@/lib/supabase'
@@ -36,181 +36,13 @@ export default function KanbanBoard() {
     type: 'success' | 'error'
   }>({ show: false, message: '', type: 'success' })
 
-  // 🚀 Initialize App: Data + Real-time
-  useEffect(() => {
-    if (user) {
-      fetchData()
-      
-      // STEP 1: Start listening to database changes
-      const cleanup = setupRealtimeSubscriptions() // Feature #3: Real-time
-      
-      // STEP 2: Return cleanup function - React will call this when:
-      // - Component unmounts (user navigates away)
-      // - Dependencies change (user logs out)
-      // - Component re-renders and needs to cleanup old subscriptions
-      return cleanup
-      
-      // ❌ WITHOUT CLEANUP: 
-      // - WebSocket connections stay open forever
-      // - Multiple subscriptions pile up
-      // - Memory leaks and performance issues
-      // - App becomes slow and buggy
-    }
-  }, [user]) // When 'user' changes, cleanup old subscription and start new one
-
-  // ===============================================
-  // 🎯 FEATURE #3: REAL-TIME SUBSCRIPTIONS
-  // ===============================================
-  
-  const setupRealtimeSubscriptions = () => {
-    console.log('🔄 Setting up real-time subscriptions...')
-    
-    // CREATE: Open WebSocket connection to Supabase
-    const subscription = supabase
-      .channel('kanban-changes')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'boards' 
-      }, (payload) => {
-        console.log('📋 Board updated in real-time:', payload)
-        fetchData()
-      })
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'lists' 
-      }, (payload) => {
-        console.log('📝 List updated in real-time:', payload)
-        fetchData()
-      })
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'cards' 
-      }, (payload) => {
-        console.log('🎴 Card updated in real-time:', payload)
-        // Small delay to avoid conflicts with optimistic updates
-        setTimeout(() => fetchData(), 100)
-      })
-      .subscribe() // 🔌 This opens the WebSocket connection
-
-    // RETURN: A function that closes the WebSocket connection
-    // React will call this function when cleanup is needed
-    return () => {
-      console.log('🧹 Cleaning up real-time subscriptions')
-      subscription.unsubscribe() // 🔌 This closes the WebSocket connection
-    }
-    
-    // 💡 EXPLANATION:
-    // 1. We create a subscription (opens WebSocket)
-    // 2. We return a function that unsubscribes (closes WebSocket) 
-    // 3. React automatically calls our returned function when needed
-    // 4. This prevents memory leaks and multiple connections
-  }
-
-  // ===============================================
-  // 🎯 FEATURE #4: AUTO-GENERATED REST APIs (READ)
-  // ===============================================
-  
-  const fetchData = async () => {
-    try {
-      console.log('📥 Fetching data with Supabase auto-generated APIs...')
-      
-      // READ: Get all boards for current user (RLS automatically filters)
-      const { data: boards, error: boardsError } = await supabase
-        .from('boards')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (boardsError) throw boardsError
-
-      // If no boards exist, create sample data
-      if (!boards || boards.length === 0) {
-        await createSampleData()
-        return
-      }
-
-      // Get the first board
-      const firstBoard = boards[0]
-      setCurrentBoard(firstBoard)
-      
-      // READ: Get lists for this board
-      const { data: lists, error: listsError } = await supabase
-        .from('lists')
-        .select('*')
-        .eq('board_id', firstBoard.id)
-        .order('position', { ascending: true })
-
-      if (listsError) throw listsError
-
-      // READ: Get cards for these lists
-      const { data: cards, error: cardsError } = await supabase
-        .from('cards')
-        .select('*')
-        .in('list_id', lists.map(list => list.id))
-        .order('position', { ascending: true })
-
-      if (cardsError) throw cardsError
-
-      setData({ boards: boards || [], lists: lists || [], cards: cards || [] })
-      console.log('✅ Data fetched successfully!')
-      
-    } catch (error) {
-      console.error('❌ Error fetching data:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // ===============================================
-  // 🎯 FEATURE #6: EDGE FUNCTIONS (Serverless)
-  // ===============================================
-  
-  const triggerCompletionNotification = async ({ cardId, cardTitle, listTitle, userEmail }: {
-    cardId: string
-    cardTitle: string  
-    listTitle: string
-    userEmail: string
-  }) => {
-    try {
-      console.log('🚀 Calling edge function for task completion...')
-      
-      // Call the edge function
-      const { data, error } = await supabase.functions.invoke('task-completion-notification', {
-        body: { cardId, cardTitle, listTitle, userEmail }
-      })
-
-      if (error) {
-        console.error('❌ Edge function error:', error)
-        showNotification(`Failed to send notification: ${error.message}`, 'error')
-        return
-      }
-
-      if (data?.success) {
-        console.log('🎉 Notification sent:', data.message)
-        showNotification(`🎉 Notification sent for "${cardTitle}"!`, 'success')
-      }
-    } catch (error) {
-      console.error('❌ Error calling edge function:', error)
-      showNotification('Failed to send notification', 'error')
-    }
-  }
-
-  // 🎉 Show UI notification
-  const showNotification = (message: string, type: 'success' | 'error') => {
-    setNotification({ show: true, message, type })
-    // Auto-hide after 3 seconds
-    setTimeout(() => {
-      setNotification({ show: false, message: '', type: 'success' })
-    }, 3000)
-  }
+  // 🚀 Initial App Loading logic moved below function definitions
 
   // ===============================================
   // 🎯 FEATURE #4: AUTO-GENERATED REST APIs (CREATE)
   // ===============================================
 
-  const createSampleData = async () => {
+  const createSampleData = useCallback(async () => {
     try {
       console.log('🌱 Creating sample data for new user...')
       
@@ -269,11 +101,171 @@ export default function KanbanBoard() {
       }
 
       console.log('✅ Sample data created!')
-      fetchData() // Refresh data
     } catch (error) {
       console.error('❌ Error creating sample data:', error)
     }
+  }, [user?.id])
+
+  // ===============================================
+  // 🎯 FEATURE #4: AUTO-GENERATED REST APIs (READ)
+  // ===============================================
+  
+  const fetchData = useCallback(async () => {
+    try {
+      console.log('📥 Fetching data with Supabase auto-generated APIs...')
+      
+      // READ: Get all boards for current user (RLS automatically filters)
+      const { data: boards, error: boardsError } = await supabase
+        .from('boards')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (boardsError) throw boardsError
+
+      // If no boards exist, create sample data
+      if (!boards || boards.length === 0) {
+        await createSampleData()
+        fetchData()
+        return
+      }
+
+      // Get the first board
+      const firstBoard = boards[0]
+      setCurrentBoard(firstBoard)
+      
+      // READ: Get lists for this board
+      const { data: lists, error: listsError } = await supabase
+        .from('lists')
+        .select('*')
+        .eq('board_id', firstBoard.id)
+        .order('position', { ascending: true })
+
+      if (listsError) throw listsError
+
+      // READ: Get cards for these lists
+      const { data: cards, error: cardsError } = await supabase
+        .from('cards')
+        .select('*')
+        .in('list_id', lists.map(list => list.id))
+        .order('position', { ascending: true })
+
+      if (cardsError) throw cardsError
+
+      setData({ boards: boards || [], lists: lists || [], cards: cards || [] })
+      console.log('✅ Data fetched successfully!')
+      
+    } catch (error) {
+      console.error('❌ Error fetching data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [createSampleData])
+
+  // ===============================================
+  // 🎯 FEATURE #3: REAL-TIME SUBSCRIPTIONS
+  // ===============================================
+  
+  const setupRealtimeSubscriptions = useCallback(() => {
+    console.log('🔄 Setting up real-time subscriptions...')
+    
+    // CREATE: Open WebSocket connection to Supabase
+    const subscription = supabase
+      .channel('kanban-changes')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'boards' 
+      }, (payload) => {
+        console.log('📋 Board updated in real-time:', payload)
+        fetchData()
+      })
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'lists' 
+      }, (payload) => {
+        console.log('📝 List updated in real-time:', payload)
+        fetchData()
+      })
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'cards' 
+      }, (payload) => {
+        console.log('🎴 Card updated in real-time:', payload)
+        // Small delay to avoid conflicts with optimistic updates
+        setTimeout(() => fetchData(), 100)
+      })
+      .subscribe() // 🔌 This opens the WebSocket connection
+
+    // RETURN: A function that closes the WebSocket connection
+    // React will call this function when cleanup is needed
+    return () => {
+      console.log('🧹 Cleaning up real-time subscriptions')
+      subscription.unsubscribe() // 🔌 This closes the WebSocket connection
+    }
+  }, [fetchData])
+
+  // 🚀 Initialize App: Data + Real-time
+  useEffect(() => {
+    if (user) {
+      fetchData()
+      
+      // STEP 1: Start listening to database changes
+      const cleanup = setupRealtimeSubscriptions() // Feature #3: Real-time
+      
+      // STEP 2: Return cleanup function - React will call this when:
+      // - Component unmounts (user navigates away)
+      // - Dependencies change (user logs out)
+      // - Component re-renders and needs to cleanup old subscriptions
+      return cleanup
+    }
+  }, [user, fetchData, setupRealtimeSubscriptions])
+
+  // ===============================================
+  // 🎯 FEATURE #6: EDGE FUNCTIONS (Serverless)
+  // ===============================================
+  
+  const triggerCompletionNotification = async ({ cardId, cardTitle, listTitle, userEmail }: {
+    cardId: string
+    cardTitle: string  
+    listTitle: string
+    userEmail: string
+  }) => {
+    try {
+      console.log('🚀 Calling edge function for task completion...')
+      
+      // Call the edge function
+      const { data, error } = await supabase.functions.invoke('task-completion-notification', {
+        body: { cardId, cardTitle, listTitle, userEmail }
+      })
+
+      if (error) {
+        console.error('❌ Edge function error:', error)
+        showNotification(`Failed to send notification: ${error.message}`, 'error')
+        return
+      }
+
+      if (data?.success) {
+        console.log('🎉 Notification sent:', data.message)
+        showNotification(`🎉 Notification sent for "${cardTitle}"!`, 'success')
+      }
+    } catch (error) {
+      console.error('❌ Error calling edge function:', error)
+      showNotification('Failed to send notification', 'error')
+    }
   }
+
+  // 🎉 Show UI notification
+  const showNotification = (message: string, type: 'success' | 'error') => {
+    setNotification({ show: true, message, type })
+    // Auto-hide after 3 seconds
+    setTimeout(() => {
+      setNotification({ show: false, message: '', type: 'success' })
+    }, 3000)
+  }
+
+  // Removed original createSampleData location since it's moved up
 
   const addCard = async (listId: string) => {
     const cardTitle = newCardTitles[listId]?.trim()
@@ -396,7 +388,7 @@ export default function KanbanBoard() {
   // 🎯 FEATURE #4: AUTO-GENERATED REST APIs (UPDATE)
   // ===============================================
 
-  const handleDragEnd = async (result: any) => {
+  const handleDragEnd = async (result: DropResult) => {
     if (!result.destination) return
 
     const { source, destination, draggableId } = result

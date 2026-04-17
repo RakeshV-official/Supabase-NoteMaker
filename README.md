@@ -306,3 +306,5 @@ If you see this error, it means your environment variables aren't set up:
 - Check `SETUP.md` for detailed setup instructions
 - Visit [Supabase Documentation](https://supabase.com/docs)
 - Ensure you're using the correct project URL and anon key
+#   S u p a b a s e - N o t e M a k e r  
+ 

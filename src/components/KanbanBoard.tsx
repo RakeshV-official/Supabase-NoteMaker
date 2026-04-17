@@ -539,7 +539,7 @@ export default function KanbanBoard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
       {/* Enhanced Header with Glass Effect */}
-      <header className="glass border-b border-white/20 sticky top-0 z-40">
+      <header className="glass border-b border-white/20 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <div className="flex items-center justify-between h-20">
             <div className="flex items-center space-x-8">
@@ -594,15 +594,15 @@ export default function KanbanBoard() {
       {/* Main Kanban Board */}
       <div className="p-6 lg:p-8">
         <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="flex gap-6 overflow-x-auto pb-6">
+          <div className="flex gap-6 pb-6" style={{ overflowX: 'auto', overflowY: 'visible' }}>
             {data.lists
               .slice()
               .sort((a, b) => a.position - b.position)
               .map((list, listIndex) => (
                 <div key={list.id} className="flex-shrink-0 w-80 slide-in-up" style={{ animationDelay: `${listIndex * 0.1}s` }}>
-                  <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 overflow-hidden">
+                  <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20">
                     {/* List Header */}
-                    <div className={`p-6 bg-gradient-to-r ${getListColor(list.title)} text-white relative overflow-hidden`}>
+                    <div className={`p-6 bg-gradient-to-r ${getListColor(list.title)} text-white relative rounded-t-2xl overflow-hidden`}>
                       <div className="absolute inset-0 bg-black/10"></div>
                       <div className="relative z-10">
                         <div className="flex items-center justify-between">
@@ -644,6 +644,10 @@ export default function KanbanBoard() {
                                     ref={provided.innerRef}
                                     {...provided.draggableProps}
                                     {...provided.dragHandleProps}
+                                    style={{
+                                      ...provided.draggableProps.style,
+                                      zIndex: snapshot.isDragging ? 9999 : 'auto',
+                                    }}
                                     className={`mb-4 group ${snapshot.isDragging ? 'shadow-2xl ring-2 ring-indigo-400' : 'card-hover'}`}
                                   >
                                     <div className="bg-white rounded-xl shadow-lg border border-slate-200/60">
